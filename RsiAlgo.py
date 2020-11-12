@@ -30,16 +30,21 @@ class BasicRSItrading(QCAlgorithm):
         self.SetStartDate(2010,1, 1)  #Set Start Date
         self.SetEndDate(2020,10,25)    #Set End Date
         self.SetCash(100000)           #Set Strategy Cash
-        self.AddEquity("TQQQ",Resolution.Daily)
-        self.AddEquity("SPY", Resolution.Daily)
-        self.AddEquity("DJI",Resolution.Daily)
-        self.AddEquity("^RUT", Resolution.Daily)
+        self.Tqqq = self.AddEquity("TQQQ",Resolution.Daily)
+        self.Tqqq.SetDataNormalizationMode(DataNormalizationMode.Raw) #set TQQQ
+        self.spy = self.AddEquity("SPY", Resolution.Daily)
+        self.spy.SetDataNormalizationMode(DataNormalizationMode.Raw) #set SPY
+        self.dji = self.AddEquity("DJI",Resolution.Daily)
+        self.dji.SetDataNormalizationMode(DataNormalizationMode.Raw) #DJI set
+        self.rut= self.AddEquity("^RUT", Resolution.Daily)
+        self.rut.SetDataNormalizationMode(DataNormalizationMode.Raw) #RUT set
         self.Debug("Starting Params taken")
         self.NUM = 0
         self.HIGH = 0
         self.NUM_Med = 0
+        self.Rebalance = 0
         self.Check = 1
-        self.rsi = self.RSI("TQQQ", 10,  MovingAverageType.Simple, Resolution.Daily)
+        self.rsi = self.RSI("TQQQ", 45,  MovingAverageType.Simple, Resolution.Daily)
         '''std = self.STD("TQQQ", 365, Resolution.Minute)'''
         '''history = self.History("TQQQ", 365,Resolution.Minute)'''
  
@@ -47,7 +52,14 @@ class BasicRSItrading(QCAlgorithm):
     def OnData(self,data):
         if self.IsWarmingUp:
             return
-       
+        
+        #Not working at the moment
+        if self.Rebalance > 0:
+            if self.Rebalance >= 7:
+                self.Rebalance = 0
+            self.Rebalance += 1
+            return
+        
         'Set holdings and base data that is to be used'
         rsiValue = self.rsi.Current.Value
         holdings_TQQQ = self.Portfolio['TQQQ'].Quantity
@@ -77,14 +89,10 @@ class BasicRSItrading(QCAlgorithm):
             #set up the sell and buy targets for the portfolio
             if value == 0:
                 Tqqq_liq_Price = self.Securities['TQQQ'].Price*.40 + self.Securities['TQQQ'].Price
-                #limit orders
-                Tqqq_limit_Price = self.Securities['TQQQ'].Price*.15 + self.Securities['TQQQ'].Price
-                SPY_limit_Price = self.Securities['SPY'].Price*.15 + self.Securities['TQQQ'].Price
-                RUT_limit_Price = self.Securities['^RUT'].Price*.15 + self.Securities['TQQQ'].Price
-                DJI_limit_Price = self.Securities['SPY'].Price*.15 + self.Securities['TQQQ'].Price
+         
                 #Stop loss vars
-                Tqqq_Limit_price = self.Securities['TQQQ'].Price *.90
-                Tqqq_Market_price = self.Securities['TQQQ'].Price *.84
+                Tqqq_Limit_price = self.Securities['TQQQ'].Price *.92
+                Tqqq_Market_price = self.Securities['TQQQ'].Price *.86
                 Tqqq_First_Sell_Target = self.Securities['TQQQ'].Price *.25 + self.Securities['TQQQ'].Price 
                 Tqqq_Sec_Sell_Target = self.Securities['TQQQ'].Price *.50 + self.Securities['TQQQ'].Price
                 Starting_Hold = self.Portfolio['TQQQ'].Quantity
@@ -102,8 +110,8 @@ class BasicRSItrading(QCAlgorithm):
             
             
             'Stop loss cases'
-            self.StopMarketOrder("TQQQ", (holdings_TQQQ*.40), Tqqq_Limit_price)
-            self.StopMarketOrder("TQQQ",(holdings_TQQQ), Tqqq_Market_price)
+            self.StopMarketOrder("TQQQ", -(holdings_TQQQ*.40), Tqqq_Limit_price)
+            self.StopMarketOrder("TQQQ",-(holdings_TQQQ), Tqqq_Market_price)
             #after we do our stopMarket order to sell all holdings we now need to liquidate everything
             if holdings_TQQQ == 0:
                 self.Liquidate("^DJI")
@@ -145,14 +153,9 @@ class BasicRSItrading(QCAlgorithm):
             #set up the sell and buy targets for the portfolio
             if value == 0:
                 Tqqq_liq_Price = self.Securities['TQQQ'].Price*.35 + self.Securities['TQQQ'].Price
-                #limit orders
-                Tqqq_limit_Price = self.Securities['TQQQ'].Price*.20 + self.Securities['TQQQ'].Price
-                SPY_limit_Price = self.Securities['SPY'].Price*.20 + self.Securities['TQQQ'].Price
-                RUT_limit_Price = self.Securities['^RUT'].Price*.20 + self.Securities['TQQQ'].Price
-                DJI_limit_Price = self.Securities['SPY'].Price*.20 + self.Securities['TQQQ'].Price
                 #Stop loss vars
-                Tqqq_Limit_price = self.Securities['TQQQ'].Price *.90
-                Tqqq_Market_price = self.Securities['TQQQ'].Price *.84
+                Tqqq_Limit_price = self.Securities['TQQQ'].Price *.94
+                Tqqq_Market_price = self.Securities['TQQQ'].Price *.87
                 Tqqq_First_Sell_Target = self.Securities['TQQQ'].Price *.25 + self.Securities['TQQQ'].Price 
                 Tqqq_Sec_Sell_Target = self.Securities['TQQQ'].Price *.50 + self.Securities['TQQQ'].Price
                 Starting_Hold = self.Portfolio['TQQQ'].Quantity
@@ -160,7 +163,7 @@ class BasicRSItrading(QCAlgorithm):
                 cash_out = 1
                 
                 
-            #Liquidate if we are up 50% on a traded
+            #Liquidate if we are up 35% on a traded
             if Tqqq_liq_Price <= Current_TQQQ_Price:
                 self.Liquidate("DJI")
                 self.Liquidate("^RUT")
@@ -168,8 +171,8 @@ class BasicRSItrading(QCAlgorithm):
                 self.Liquidate("TQQQ")
            
            
-            self.StopMarketOrder("TQQQ", (holdings_TQQQ*.40), Tqqq_Limit_price)
-            self.StopMarketOrder("TQQQ",holdings_TQQQ, Tqqq_Market_price)
+            self.StopMarketOrder("TQQQ", -(holdings_TQQQ*.40), Tqqq_Limit_price)
+            self.StopMarketOrder("TQQQ",-holdings_TQQQ, Tqqq_Market_price)
             
             #after we do our stopMarket order to sell all holdings we now need to liquidate everything
             if holdings_TQQQ == 0:
@@ -197,8 +200,7 @@ class BasicRSItrading(QCAlgorithm):
                 #Stop loss vars
                 Tqqq_Limit_price = self.Securities['TQQQ'].Price *.90
                 Tqqq_Market_price = self.Securities['TQQQ'].Price *.84
-                self.StopMarketOrder("TQQQ", (holdings_TQQQ*.40), Tqqq_Limit_price)
-                self.StopMarketOrder("TQQQ",holdings_TQQQ, Tqqq_Market_price)
+          
      
             #after we do our stopMarket order to sell all holdings we now need to liquidate everything
             if holdings_TQQQ == 0:
