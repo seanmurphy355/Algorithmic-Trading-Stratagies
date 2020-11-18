@@ -46,7 +46,7 @@ class BasicRSItrading(QCAlgorithm):
         self.NUM_Med = 0
         self.Rebalance = 0
         self.Check = 1
-        self.rsi = self.RSI("TQQQ", 45,  MovingAverageType.Simple, Resolution.Daily)
+        self.rsi = self.RSI("TQQQ", 30,  MovingAverageType.Simple, Resolution.Daily)
         '''std = self.STD("TQQQ", 365, Resolution.Minute)'''
         '''history = self.History("TQQQ", 365,Resolution.Minute)'''
  
@@ -55,7 +55,7 @@ class BasicRSItrading(QCAlgorithm):
         if self.IsWarmingUp:
             return
         
-        if (self.Time - self.stopMarketOrderFillTime).days < 15:
+        if (self.Time - self.stopMarketOrderFillTime).days <= 0:
             return
         
         'Set holdings and base data that is to be used'
@@ -86,7 +86,7 @@ class BasicRSItrading(QCAlgorithm):
             if self.Securities["TQQQ"].Close > self.highestTQQQPrice:
                 self.highestTQQQPrice = self.Securities["TQQQ"].Close
                 updateFields = UpdateOrderFields()
-                updateFields.StopPrice = self.highestTQQQPrice * 0.9
+                updateFields.StopPrice = self.highestTQQQPrice * 0.85
                 self.stopMarketTicket.Update(updateFields)
                 self.Debug("TQQQ: " + str(self.highestTQQQPrice) + " Stop: " + str(updateFields.StopPrice))
                 
@@ -123,7 +123,7 @@ class BasicRSItrading(QCAlgorithm):
                 if self.Securities["TQQQ"].Close > self.highestTQQQPrice:
                     self.highestTQQQPrice = self.Securities["TQQQ"].Close
                     updateFields = UpdateOrderFields()
-                    updateFields.StopPrice = self.highestTQQQPrice * 0.9
+                    updateFields.StopPrice = self.highestTQQQPrice * 0.90
                     self.stopMarketTicket.Update(updateFields)
                     self.Debug("TQQQ: " + str(self.highestTQQQPrice) + " Stop: " + str(updateFields.StopPrice))
            
@@ -165,7 +165,7 @@ class BasicRSItrading(QCAlgorithm):
             self.NUM_Med = 1
             
             
-    #order events
+    #order
     def OnOrderEvent(self, orderEvent):
         if orderEvent.Status != OrderStatus.Filled:
             return
