@@ -28,25 +28,25 @@ class BasicRSItrading(QCAlgorithm):
         self.SetWarmUp(self.window_size)
         
         # Symbols to Trade
-        self.equity_symbols = ['TQQQ', 'DJI', '^RUT', 'DUSL', "NDAQ"]
+        self.equity_symbols = ['TQQQ', 'UDOW', 'URTY', 'DUSL', "NDAQ"]
         
-        self.SetStartDate(2010,1, 1)  #Set Start Date
+        self.SetStartDate(2010,10, 25)  #Set Start Date
         self.SetEndDate(2020,10,25)    #Set End Date
         self.SetCash(100000)           #Set Strategy Cash
         self.Tqqq = self.AddEquity("TQQQ",Resolution.Daily)
         self.Tqqq.SetDataNormalizationMode(DataNormalizationMode.Raw) #set TQQQ
         self.spy = self.AddEquity("SPY", Resolution.Daily)
         self.spy.SetDataNormalizationMode(DataNormalizationMode.Raw) #set SPY
-        self.dji = self.AddEquity("DJI",Resolution.Daily)
-        self.dji.SetDataNormalizationMode(DataNormalizationMode.Raw) #DJI set
-        self.rut= self.AddEquity("^RUT", Resolution.Daily)
+        self.UDOW = self.AddEquity("UDOW",Resolution.Daily)
+        self.UDOW.SetDataNormalizationMode(DataNormalizationMode.Raw) #UDOW set
+        self.rut= self.AddEquity("URTY", Resolution.Daily)
         self.rut.SetDataNormalizationMode(DataNormalizationMode.Raw) #RUT set
         self.NUM = 0
         self.HIGH = 0
         self.NUM_Med = 0
         self.Rebalance = 0
         self.Check = 1
-        self.rsi = self.RSI("TQQQ", 30,  MovingAverageType.Simple, Resolution.Daily)
+        self.rsi = self.RSI("TQQQ", 60,  MovingAverageType.Simple, Resolution.Daily)
         '''std = self.STD("TQQQ", 365, Resolution.Minute)'''
         '''history = self.History("TQQQ", 365,Resolution.Minute)'''
  
@@ -62,8 +62,8 @@ class BasicRSItrading(QCAlgorithm):
         rsiValue = self.rsi.Current.Value
         holdings_TQQQ = self.Portfolio['TQQQ'].Quantity
         holdings_SPY = self.Portfolio['SPY'].Quantity
-        holdings_RUT = self.Portfolio['^RUT'].Quantity
-        holdings_DJI = self.Portfolio['DJI'].Quantity
+        holdings_RUT = self.Portfolio['URTY'].Quantity
+        holdings_UDOW = self.Portfolio['UDOW'].Quantity
        
             
         'Check to see if this is a good Trade based on the current RSI of the TQQQ in this case we are over sold '
@@ -75,8 +75,8 @@ class BasicRSItrading(QCAlgorithm):
             #set up the intial dist of the portfolio as well as starting marketTicket
             if value == 0:
                 self.SetHoldings("TQQQ",.70)
-                self.SetHoldings("DJI",.10)
-                self.SetHoldings("^RUT",.10)
+                self.SetHoldings("UDOW",.10)
+                self.SetHoldings("URTY",.10)
                 self.SetHoldings("SPY",.10)
                 #Generate a stop Market ticket and a Stop market order that is to sell all Tqqq holdings if price drops below close
                 self.stopMarketTicket = self.StopMarketOrder("TQQQ", -holdings_TQQQ, 0.85 * self.highestTQQQPrice)
@@ -92,8 +92,8 @@ class BasicRSItrading(QCAlgorithm):
                 
             #after we do our stopMarket order to sell all holdings we now need to liquidate everything
             if holdings_TQQQ == 0:
-                self.Liquidate("^DJI")
-                self.Liquidate("^RUT")
+                self.Liquidate("^UDOW")
+                self.Liquidate("URTY")
                 self.Liquidate("SPY")
                 
             #Set flags to starting values
@@ -112,8 +112,8 @@ class BasicRSItrading(QCAlgorithm):
             #Generate a stop Market ticket and a Stop market order that is to sell all Tqqq holdings if price drops below close
             if value == 0:
                 self.SetHoldings("TQQQ",.25)
-                self.SetHoldings("^RUT",.25)
-                self.SetHoldings("DJI",.25)
+                self.SetHoldings("URTY",.25)
+                self.SetHoldings("UDOW",.25)
                 self.SetHoldings("SPY",.25)
                 self.stopMarketTicket = self.StopMarketOrder("TQQQ", -holdings_TQQQ, 0.90 * self.highestTQQQPrice)
                 self.Debug("enter1")
@@ -130,8 +130,8 @@ class BasicRSItrading(QCAlgorithm):
                 
             #after we do our stopMarket order to sell all holdings we now need to liquidate everything
             if holdings_TQQQ == 0:
-                self.Liquidate("^DJI")
-                self.Liquidate("^RUT")
+                self.Liquidate("UDOW")
+                self.Liquidate("URTY")
                 self.Liquidate("SPY")
                 
                 
@@ -148,15 +148,15 @@ class BasicRSItrading(QCAlgorithm):
             #set up the intial dist of the portfolio
             self.SetHoldings("TQQQ",.50)
             self.SetHoldings("SPY",.15)
-            self.SetHoldings("^RUT",.15)
-            self.SetHoldings("DJI",.20)
+            self.SetHoldings("URTY",.15)
+            self.SetHoldings("UDOW",.20)
             self.Debug("distrib")
             
     
             #after we do our stopMarket order to sell all holdings we now need to liquidate everything
             if holdings_TQQQ == 0:
-                self.Liquidate("^DJI")
-                self.Liquidate("^RUT")
+                self.Liquidate("^UDOW")
+                self.Liquidate("URTY")
                 self.Liquidate("SPY")
             
             #Set flags to starting values
