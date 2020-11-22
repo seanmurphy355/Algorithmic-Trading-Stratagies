@@ -46,7 +46,7 @@ class BasicRSItrading(QCAlgorithm):
         self.NUM_Med = 0
         self.Rebalance = 0
         self.Check = 1
-        self.rsi = self.RSI("TQQQ", 60,  MovingAverageType.Simple, Resolution.Daily)
+        self.rsi = self.RSI("TQQQ", 45,  MovingAverageType.Simple, Resolution.Daily)
         '''std = self.STD("TQQQ", 365, Resolution.Minute)'''
         '''history = self.History("TQQQ", 365,Resolution.Minute)'''
  
@@ -55,7 +55,7 @@ class BasicRSItrading(QCAlgorithm):
         if self.IsWarmingUp:
             return
         
-        if (self.Time - self.stopMarketOrderFillTime).days <= 0:
+        if (self.Time - self.stopMarketOrderFillTime).days <= 4:
             return
         
         'Set holdings and base data that is to be used'
@@ -74,10 +74,10 @@ class BasicRSItrading(QCAlgorithm):
         
             #set up the intial dist of the portfolio as well as starting marketTicket
             if value == 0:
-                self.SetHoldings("TQQQ",.70)
-                self.SetHoldings("UDOW",.10)
-                self.SetHoldings("URTY",.10)
-                self.SetHoldings("SPY",.10)
+                self.SetHoldings("TQQQ",.25)
+                self.SetHoldings("UDOW",.25)
+                self.SetHoldings("URTY",.25)
+                self.SetHoldings("SPY",.25)
                 #Generate a stop Market ticket and a Stop market order that is to sell all Tqqq holdings if price drops below close
                 self.stopMarketTicket = self.StopMarketOrder("TQQQ", -holdings_TQQQ, 0.85 * self.highestTQQQPrice)
                 self.Debug("enter0")
@@ -111,11 +111,11 @@ class BasicRSItrading(QCAlgorithm):
             #set up the intial dist of the portfolio
             #Generate a stop Market ticket and a Stop market order that is to sell all Tqqq holdings if price drops below close
             if value == 0:
-                self.SetHoldings("TQQQ",.25)
-                self.SetHoldings("URTY",.25)
-                self.SetHoldings("UDOW",.25)
-                self.SetHoldings("SPY",.25)
-                self.stopMarketTicket = self.StopMarketOrder("TQQQ", -holdings_TQQQ, 0.90 * self.highestTQQQPrice)
+                self.SetHoldings("TQQQ",.70)
+                self.SetHoldings("URTY",.10)
+                self.SetHoldings("UDOW",.10)
+                self.SetHoldings("SPY",.10)
+                self.stopMarketTicket = self.StopMarketOrder("TQQQ", -holdings_TQQQ, 0.93 * self.highestTQQQPrice)
                 self.Debug("enter1")
             
             #make sure that the stop ticket was set before updating the adaptive stop fields.
@@ -123,7 +123,7 @@ class BasicRSItrading(QCAlgorithm):
                 if self.Securities["TQQQ"].Close > self.highestTQQQPrice:
                     self.highestTQQQPrice = self.Securities["TQQQ"].Close
                     updateFields = UpdateOrderFields()
-                    updateFields.StopPrice = self.highestTQQQPrice * 0.90
+                    updateFields.StopPrice = self.highestTQQQPrice * 0.93
                     self.stopMarketTicket.Update(updateFields)
                     self.Debug("TQQQ: " + str(self.highestTQQQPrice) + " Stop: " + str(updateFields.StopPrice))
            
@@ -152,10 +152,11 @@ class BasicRSItrading(QCAlgorithm):
             self.SetHoldings("UDOW",.20)
             self.Debug("distrib")
             
-    
+            
+            
             #after we do our stopMarket order to sell all holdings we now need to liquidate everything
             if holdings_TQQQ == 0:
-                self.Liquidate("^UDOW")
+                self.Liquidate("UDOW")
                 self.Liquidate("URTY")
                 self.Liquidate("SPY")
             
