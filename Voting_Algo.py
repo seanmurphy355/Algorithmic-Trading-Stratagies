@@ -1,23 +1,25 @@
 import pandas as pd
 import numpy as np
-
+from QuantConnect.Python import PythonQuandl
+from QuantConnect.Data.Custom.CBOE import *
 
 class BasicRSItrading(QCAlgorithm):
     '''Basic template algorithm simply initializes the date range and cash'''
 
     def Initialize(self):
         self.SetStartDate(2010,1, 1)  #Set Start Date
-        self.SetEndDate(2020,12,25)    #Set End Date
+        # self.SetEndDate(2020,1,25)    #Set End Date
         self.SetCash(100000)           #Set Strategy Cash
         
         # Symbols to Trade
-        self.equity_symbols = ['TQQQ', 'DJI', '^RUT', 'DUSL', "NDAQ"]
+        self.equity_symbols = ['TQQQ', 'UDOW', 'URTY', "SPY"]
+        
         
         # Store SymbolData objects with symbols as key
         self.Data = {}
         
         # window size
-        self.window_size = 14
+        self.window_size = 18
         
         # warm up period of size window_size before we start analysis
         self.SetWarmUp(self.window_size)
@@ -32,7 +34,13 @@ class BasicRSItrading(QCAlgorithm):
         self.max_num_signals = float('-inf')
         
         # define number of indicators in order to buy
-        self.NUM_INDICATORS = 1
+        self.NUM_INDICATORS = 2
+        
+        # trailing stop
+        self.trailing_stop = 0
+        
+        # buy price
+        self.buy_price = 0
 
 
     def OnData(self, data):
@@ -63,26 +71,54 @@ class BasicRSItrading(QCAlgorithm):
                 temp_symbol = symbol
                 temp_num_signal =  indicator_count
         
-        # if we found a different symbol to buy       
+        # if we found a different symbol to buy
+      
+        if not temp_symbol or not data.ContainsKey(temp_symbol):
+            return
+        
         if temp_symbol != self.current_invested_symbol and temp_num_signal >= self.NUM_INDICATORS:
             # sell previous symbol if we have one
             if temp_symbol:
-                self.Log(f"Sold {temp_symbol} {self.Portfolio[temp_symbol].Quantity}, Indicators {temp_num_signal}")
+                # self.Log(f"Sold {temp_symbol} {self.Portfolio[temp_symbol].Quantity}, Indicators {temp_num_signal}")
                 self.Liquidate(temp_symbol)
                 
             # buy current one if we aren't already invested
             if self.Portfolio.Invested  == False:
                 self.SetHoldings(temp_symbol, 1.0)
-                self.Log(f"Bought {temp_symbol} {self.Portfolio[temp_symbol].Quantity}, Indicators {temp_num_signal}")
+                self.buy_price = self.Securities[temp_symbol].Price
+                # self.Log(f"Bought {temp_symbol} {self.Portfolio[temp_symbol].Quantity}, Indicators {temp_num_signal}")
                 self.current_invested_symbol = temp_symbol
                 self.max_num_signals = temp_num_signal
                 
-        elif self.max_num_signals < self.NUM_INDICATORS:
-            self.Liquidate(self.current_invested_symbol)
-
-    # def OnEndOfAlgorithm(self):
-    #     if self.Portfolio[self.current_invested_symbol].Invested:
-    #         self.Liquidate(self.current_invested_symbol)
+                self.highestPrice = self.Securities[temp_symbol].Close
+                
+        elif self.Portfolio[self.current_invested_symbol].Quantity > 0:
+            if self.Securities[self.current_invested_symbol].Price < self.trailing_stop:
+                self.Liquidate(self.current_invested_symbol)
+                self.trailing_stop = 0
+                self.current_invested_symbol = None
+                
+            elif self.Data[self.current_invested_symbol].StopBB():
+                self.Liquidate(self.current_invested_symbol)
+                self.trailing_stop = 0
+                self.current_invested_symbol = None
+        
+        if self.current_invested_symbol:
+                stop_loss = self.Data[self.current_invested_symbol].StopATR()
+                if stop_loss > self.trailing_stop:
+                    # self.Log(f"New Stop Loss... Old: {self.highestPrice}, New: {stop_loss}")
+                    self.trailing_stop = stop_loss
+                    
+                    # %15 hard stop loss 
+                if self.buy_price < self.Securities[self.current_invested_symbol].Close:
+                    self.buy_price = self.Securities[self.current_invested_symbol].Close
+                    
+                if self.buy_price > 0 and self.Securities[self.current_invested_symbol].Close <= self.buy_price * .80:
+                    # self.Log(f"Stop Loss Triggered at {self.buy_price} {self.Securities[self.current_invested_symbol].Close} ")
+                    self.Liquidate(self.current_invested_symbol)
+                    self.trailing_stop = 0
+                    self.buy_price = 0
+    
             
 class SymbolData:
     
@@ -96,19 +132,28 @@ class SymbolData:
         self.stop_loss = None
         self.window_size = 14
         
-        # initialize indicators and data trackers
+        # initialize Momentum indicators and data trackers
         self.close = algorithm.Identity(symbol)
         self.RSI_ind  = algorithm.RSI(symbol, self.window_size)
         self.ROC_ind  = algorithm.ROC(symbol, self.window_size)
         self.ADX_ind  = algorithm.ADX(symbol, self.window_size)
         self.AROON_ind = algorithm.AROON(symbol, self.window_size)
+        self.ATR_ind = algorithm.ATR(symbol, self.window_size)
+        self.bollinger = algorithm.BB(symbol, self.window_size, 1)
+        
+        #initialize volitility indicators
+        self.SAR_Ind = algorithm.PSAR(symbol, afStart=0.02, afIncrement=0.02, afMax=0.02)
+        
         
         # flag for when all indicators are ready to be read from
-        self.isReady = self.RSI_ind.IsReady and self.ROC_ind.IsReady and self.ADX_ind.IsReady and self.AROON_ind.IsReady and self.close.IsReady
+        self.isReady = self.RSI_ind.IsReady and self.ROC_ind.IsReady and self.ADX_ind.IsReady and self.AROON_ind.IsReady and self.close.IsReady and self.SAR_Ind.IsReady
+        
+        # track stop loss value
+        self.stop_loss = 0
         
     # function to update isReady flag and return number of indicators
     def Update(self):
-        self.isReady = self.RSI_ind.IsReady and self.ROC_ind.IsReady and self.ADX_ind.IsReady and self.AROON_ind.IsReady and self.close.IsReady
+        self.isReady = self.RSI_ind.IsReady and self.ROC_ind.IsReady and self.ADX_ind.IsReady and self.AROON_ind.IsReady and self.close.IsReady and self.SAR_Ind.IsReady
         return self.TryEnter()
         
     # function to calculate number of indicators and return them
@@ -119,18 +164,33 @@ class SymbolData:
         # self.algorithm.Log(f"Calculating Indicators....")
         num_buy_singals = 0
         
-        if self.RSI_ind.Current.Value > 30:
+        if self.RSI_ind.Current.Value > 70:
+            # self.algorithm.Log(f"RSI Trigger")
             num_buy_singals += 1
         
-        if self.ROC_ind.Current.Value > .10:
+        if self.ROC_ind.Current.Value > .05:
+            # self.algorithm.Log(f"ROC Trigger")
             num_buy_singals += 1
             
-        if self.ADX_ind.Current.Value > 25 and self.ADX_ind.PositiveDirectionalIndex > self.ADX_ind.NegativeDirectionalIndex:
+        if self.ADX_ind.Current.Value > 30 and self.ADX_ind.PositiveDirectionalIndex > self.ADX_ind.NegativeDirectionalIndex:
+            # self.algorithm.Log(f"ADX Trigger")
             num_buy_singals += 1
             
-        if self.AROON_ind.Current.Value > 10:
+        if self.AROON_ind.AroonUp.Current.Value > 45:
+            # self.algorithm.Log(f"AROON Trigger")
+            num_buy_singals += 1
+        
+        if self.algorithm.Securities[self.Symbol].Close >= self.bollinger.UpperBand.Current.Value:
             num_buy_singals += 1
         
         # self.algorithm.Log(f"Calculated Indicators -> {num_buy_singals}\n")
         
         return num_buy_singals
+    
+    def StopATR(self):
+        
+        return self.algorithm.Securities[self.Symbol].Close - (self.ATR_ind.Current.Value * 2 )
+    
+    def StopBB(self):
+        return self.algorithm.Securities[self.Symbol].Close < self.bollinger.LowerBand.Current.Value
+        
